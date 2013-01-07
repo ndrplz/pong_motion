@@ -1,7 +1,7 @@
 /**
  * Pong motion 
  * by Andrea Palazzi. 
- * Application of the bare basics of video gaming and video analysis in Processing language.  
+ * Simple game that covers the bare basics of video gaming and video analysis in Processing language.  
  */
 
 import processing.video.*;
