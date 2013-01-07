@@ -1,0 +1,313 @@
+/**
+ * Pong motion 
+ * by Andrea Palazzi. 
+ * Application of the bare basics of video gaming and video analysis in Processing language.  
+ */
+
+import processing.video.*;
+
+//----- variables for PONG game finish here -----
+//displacement of the ball during the game (change these to change speed)
+final int DX = 1;
+final int DY = 2;
+//margin from borders
+int side_margin = 50;
+int top_margin = 140;
+//initial ball position
+int initial_xball = 30;
+int initial_yball = 40;
+//ball position
+int xball = initial_xball + side_margin;
+int yball = initial_yball + top_margin;
+//shift along the X and Y axes
+int accx = DX;
+int accy = DY;
+//two players' score
+int pA=0;
+int pB=0;
+//PONG court dimensions
+int court_width = 400;
+int court_height = 300;
+//height of racket on the screen
+int yrackA = court_height/2+top_margin;
+int yrackB = court_height/2+top_margin;
+//pause variable
+boolean paused = true;
+//speed up
+boolean increase_level = true;
+//fonts
+PFont font_score,font_title,font2;
+//----- variables for PONG game finish here -----
+
+//----- variables for video frame editing start here -----
+Capture video;
+//number of pixels in a video frame
+int numPixels;
+//array containing pixels of background image
+int[] backgroundPixels;
+//flag to check if the background has already been saved
+boolean takenBackground = false;
+//variables to contain the color difference between the last two frames
+int diffR, diffG, diffB;
+//threshold beyond which we consider relevant a color difference between the current frame and the previous
+final int THRESHOLD = 43;
+//aux variables for video frame analysis
+float current_row_brightness;
+int  row_left;
+int  row_right;
+boolean  found_left;
+boolean  found_right;
+//----- variables for video frame editing finish here -----
+
+
+void setup() {
+  
+  size(1190,580);
+  background(0);
+  stroke(255);
+  
+  //font for score
+  font_score=createFont("Verdana", 50);
+  //font for title
+  font_title=createFont("Aurora", 50);
+  //font for pause
+  font2=createFont("Arial",20);
+
+  fill(255);
+  // The name of the capture device is dependent on the cameras that are currently 
+  // attached to your computer. To get a list of the choices, uncomment the following line 
+  // println(Capture.list());
+  video = new Capture(this, 640, 480, "ASUS USB2.0 Webcam");
+  video.start();
+  numPixels = video.width * video.height;
+  // Create array to store the background image
+  backgroundPixels = new int[numPixels];
+  // Make the pixels[] array available for direct manipulation
+  loadPixels();
+  
+}
+
+
+
+void draw() {
+  //clear the screen
+  background(0);
+  
+  if (video.available()==true) {
+    video.read(); // Read a new video frame
+    video.loadPixels(); // Make the pixels of video available
+    // Difference between the current frame and the stored background      
+    for (int i = 0; i < numPixels; i++) { // For each pixel in the video frame...
+      // Fetch the current color in that location, and also the color
+      // of the background in that spot
+      color currColor = video.pixels[i];
+      color backColor = backgroundPixels[i];
+      // Extract the red, green, and blue components of the current pixel�s color
+      int currR = (currColor >> 16) & 0xFF;
+      int currG = (currColor >> 8) & 0xFF;
+      int currB = currColor & 0xFF;
+      int backR = (backColor >> 16) & 0xFF;
+      int backG = (backColor >> 8) & 0xFF;
+      int backB = backColor & 0xFF;
+      //Riga nera separa la prima fetta analizzata
+      if(i%640 == 200)
+        video.pixels[i] = #000000;
+      if(i%640 == 440)
+        video.pixels[i] = #000000;
+      if(takenBackground){
+        if(i%640 < 200){ //we are working on the left column of the video frame, of size: 200 pixels
+          diffR = abs(currR - backR);
+          if(diffR > THRESHOLD) {diffR=255; diffG=255; diffB=255;}
+          diffG = abs(currG - backG);
+          if(diffG > THRESHOLD) {diffR=255; diffG=255; diffB=255;}
+          diffB = abs(currB - backB);
+          if(diffB > THRESHOLD) {diffR=255; diffG=255; diffB=255;}
+
+          video.pixels[i] = color(diffR,diffG,diffB);
+        } else if(i%640 > 440){ ////we are working on the left column of the video frame, of size: 200 pixel (640-200 = 440)
+          diffR = abs(currR - backR);
+          if(diffR > THRESHOLD) {diffR=255; diffG=255; diffB=255;}
+          diffG = abs(currG - backG);
+          if(diffG > THRESHOLD) {diffR=255; diffG=255; diffB=255;}
+          diffB = abs(currB - backB);
+          if(diffB > THRESHOLD) {diffR=255; diffG=255; diffB=255;}
+
+          video.pixels[i] = color(diffR,diffG,diffB);
+        }
+      }
+
+    }
+    updatePixels(); // Notify that the pixels[] array has changed
+  }
+  //-------------------------------------------------------------------------------------------
+  
+  
+  //----- frame processing to understand player position starts here ------
+  current_row_brightness = 0;
+  row_left =-1;
+  row_right = -1;
+  found_left = false;
+  found_right = false;
+  
+  for (int i = 0; i < 480; i++) {
+    //left side of video
+    if(!found_left){
+      current_row_brightness = 0;
+      for(int j=0; j<200; j++){
+        current_row_brightness += brightness(video.pixels[i*640 + j]);
+      }
+      //compute average brightness for row 'i'
+      current_row_brightness = current_row_brightness/200; 
+      if(current_row_brightness > THRESHOLD){ ////if average brightness is relevant
+        found_left = true;
+        row_left = i;
+      }
+    }
+    //right side of video  
+    if(!found_right){
+      current_row_brightness = 0;
+      for(int j=440; j<640; j++){
+        current_row_brightness += brightness(video.pixels[i*640+j]);
+      }
+      //compute average brightness for row 'i'
+      current_row_brightness = current_row_brightness/200; 
+      if(current_row_brightness > THRESHOLD){ //if average brightness is relevant
+        found_right = true;
+        row_right = i;
+      }
+    }  
+
+  } //fine for da 0 a 480 (altezza video)  
+  set(side_margin+court_width+side_margin,50, video);
+  //----- frame processing to understand player position starts here ------
+
+  //------------------------------------------------------------------------------------------
+  //draw the PONG court
+  noFill();
+  rect(side_margin,top_margin,court_width,court_height); 
+  
+  //add the score
+  fill(100);//grey color
+  textFont(font_title);
+  text("PONG in Motion!",side_margin+1,top_margin-35);
+  textFont(font_score);
+  text("p1:"+pA,30+side_margin,(court_height+80)+top_margin-10);
+  text("p2:"+pB,230+side_margin,(court_height+80)+top_margin-10);
+  
+  fill(255);//white color for the rackets
+  //draw the rackets
+  rect(10+side_margin,yrackA-30,10,60);
+  rect(380+side_margin,yrackB-30,10,60);
+
+  //Check if the game is paused. If is not, draw the middle line and update ball position
+  if(paused==false) {
+    //line in the middle of PONG field
+    line(court_width/2+side_margin,top_margin,court_width/2+side_margin,court_height+top_margin);
+    //update ball position
+    xball = xball + accx;
+    yball = yball + accy;
+    //draw the "ball"
+    ellipse(xball,yball,12,12);
+  }
+  else {
+    //game is paused
+    if(xball == initial_xball+side_margin && yball == initial_yball+top_margin){
+      //the game is not started yet, so display tutorial
+      textFont(font2);
+      text("First press 'b' to get the background.",45+side_margin,160+top_margin);
+      text("Then press 'p' to start!",100+side_margin,180+top_margin);
+    } else {
+      //the game is already started and 'pause' has been pressed
+      textFont(font2);
+      text("PAUSE",165+side_margin,150+top_margin);
+    } 
+  }
+  
+  //----- Collision control starts here -----
+  //Check collision with top and bottom borders
+  if( (yball+10 > court_height+top_margin) || (yball < top_margin+6) ) {
+    accy = accy*-1;
+  }
+  //Check collision with left and right borders
+  if( xball+10 > court_width+side_margin) {
+    pA += 1;
+    xball = initial_xball + side_margin;
+    yball = initial_yball + top_margin;
+    accx = DX;
+    accy = DY;
+  }
+  if(xball < side_margin) {
+    pB += 1;
+    xball = initial_xball + side_margin;
+    yball = initial_yball + top_margin;
+    accx = DX;
+    accy = DY;
+  }
+  //Check collision with rackets
+  if(xball <= 20+side_margin) {
+    if((yball > yrackA-30) && (yball < yrackA+20)) {
+      accx=-accx;
+      if(increase_level)
+        if(accx>0) accx++;
+        else accx--;
+    }
+  }
+  if(xball >= 370+side_margin) {
+    if((yball>yrackB-30) && (yball<yrackB+20)) {
+      accx=-accx;
+      if(increase_level)
+        if(accx>0) accx++;
+        else accx--;
+
+    }
+  }
+  //----- Collision control ends here -----
+
+  //----- Update rackets position according to the video editing results
+  // row_left : 480 = y_cercata : 300
+  int y_cercata = int(300*row_left/480)+top_margin; //DICHIARARE y_cercata sopra!
+  //costringo nei limiti del campo
+  if(y_cercata < top_margin+30)
+    y_cercata = top_margin+30;
+  else if(y_cercata > top_margin+270)
+    y_cercata = top_margin+270;
+  yrackA = y_cercata;
+    
+  y_cercata = int(300*row_right/480)+top_margin;
+  //costringo nei limiti del campo
+  if(y_cercata < top_margin+30)
+    y_cercata = top_margin+30;
+  else if(y_cercata > top_margin+270)
+    y_cercata = top_margin+270;
+  yrackB = y_cercata;
+  
+  //Draw a line on the height of players
+  strokeWeight(3);
+  stroke(255);
+  line(500,50+row_left,700,50+row_left); //line to see the row_left
+  line(940,50+row_right,1140,50+row_right); //line to see the row_right
+  strokeWeight(1);
+  
+}//draw() ends here
+
+
+
+
+void keyPressed() {
+  if(key=='p') {
+    //che if pause is pressed
+    if(!paused)
+      paused=true;
+    else
+      paused=false;
+    
+  } 
+  //get the background img
+  if(key=='b'){
+    video.loadPixels();
+    arraycopy(video.pixels, backgroundPixels);
+    takenBackground=true;
+  }
+}
+
+
